@@ -14,6 +14,7 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from boxes import *
+from boxes.Color import *
 from boxes.lids import LidSettings
 
 
@@ -46,7 +47,7 @@ class tilecounter(Boxes):
             help="Front hight as a precentage of overall height")
 
     def axel(self):
-        h, y = self.h, self.y
+        h, y = self.ctx.hole_y, self.ctx.hole_x
         axel_dia = self.axel_dia
         t = self.thickness
 
@@ -67,14 +68,19 @@ class tilecounter(Boxes):
     def tile_number(self):
         x, y = self.x, self.y
         h, w = self.ctx.tile_h, self.ctx.tile_w
-        font_size = min(h,w) * 0.95
+        font_size = min(h,w) * 0.95 / len(str(self.ctx.tile_num))
         tile_num = self.ctx.tile_num
-        self.text(str(tile_num), w/4.0, h/2.0, fontsize=font_size, align="middle center")
+        self.text(str(tile_num), (w/2.0)-(font_size/5), h/2.0, fontsize=font_size, align="middle center")
     
+    @holeCol
     def tile_slot(self):
         h, w = self.ctx.tile_h, self.ctx.tile_w
         axel_dia = self.axel_dia
+        
+        self.ctx.stroke()
+        self.set_source_color(Color.MAGENTA)
         self.rectangularHole(0, h/4.0, w, axel_dia )
+        self.ctx.stroke()
 
     def render(self):
         x, y, h, front_h_percent = self.x, self.y, self.h, self.front_h_percent
@@ -94,7 +100,9 @@ class tilecounter(Boxes):
         tile_width = ( x - (gap * tiles + 2 * gap) ) / tiles
 
         endplate_cb = [ self.axel, self.curve ]
-        with self.saved_context():
+        with self.saved_context() as ctx:
+            ctx.hole_x = y
+            ctx.hole_y = h
             if self.bottom_edge != "e":
                 self.rectangularWall(x, y, "ffff", label="3", move="up")
             self.rectangularWall(y, h, [b, "f", t2, "f"],
@@ -105,8 +113,23 @@ class tilecounter(Boxes):
                                  ignore_widths=[1, 6], label="1", move="up")
             self.rectangularWall(x, h, [b, sideedge, t3, sideedge],
                                  ignore_widths=[1, 6], label="2", move="up")
-        self.rectangularWall(x, h, [b, sideedge, t3, sideedge],
+        self.rectangularWall(y, h, [b, sideedge, t3, sideedge],
                              ignore_widths=[1, 6], label="3", move="right only")
+        with self.saved_context() as ctx:
+            tile_spacer_cb = [ self.axel ]
+            vert_spacers = int((h*2) / (t*2))-2
+            for tile in range(1,tiles + 3):
+                ctx.hole_x = 0
+                ctx.hole_y = t*2
+                self.roundedPlate(t*2, t*2, t, edge='e', extend_corners=False, 
+                    callback=tile_spacer_cb, move="up")
+                if tile % vert_spacers == 0:
+                    self.roundedPlate(t*2, t*2, t, edge='e', extend_corners=False, 
+                        move=f"right { 'down ' * vert_spacers }only")
+        
+        self.rectangularWall(x-((t*2*(tiles+3))/vert_spacers), h, [b, sideedge, t3, sideedge],
+                     ignore_widths=[1, 6], label="3", move="right only")
+
         
         tile_front_cb = [ self.tile_number, self.tile_slot ]
         tile_back_cb = [ ] # ending position of roundedPlate doesn't seem consitant making slotting both fails
@@ -116,19 +139,14 @@ class tilecounter(Boxes):
             line=1
             for tile in range(1,tiles + 1):
                 ctx.tile_num = tile
-                self.roundedPlate(ctx.tile_w, ctx.tile_h, 6, edge='e', extend_corners=False, 
+                tile_corner_r = min(ctx.tile_w/2, 6)
+                self.roundedPlate(ctx.tile_w, ctx.tile_h, tile_corner_r, edge='e', extend_corners=False, 
                     callback=tile_front_cb, move="up")
-                self.roundedPlate(ctx.tile_w, ctx.tile_h, 6, edge='e', extend_corners=False, 
+                self.roundedPlate(ctx.tile_w, ctx.tile_h, tile_corner_r, edge='e', extend_corners=False, 
                     callback=tile_back_cb, move="up")
                 self.rectangularWall(ctx.tile_w, ctx.tile_h,  move="right down only")
                 self.rectangularWall(ctx.tile_w, ctx.tile_h,  move="down only")
-                #print(tile * tile_width,x-y)
-                #if ( tile * 2 * tile_width >= (x - y)*line ):
-                #    print("push")
-                #    self.rectangularWall(ctx.tile_w, ctx.tile_h,  move="right only")
-                #    line += 1
-                #    #self.roundedPlate(ctx.tile_w, ctx.tile_h, 6, edge='e', extend_corners=False, 
-                #    #    callback=None, move="up")
+            
 
 
 
